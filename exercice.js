@@ -39,84 +39,132 @@ const ROOMS = [
 // Tirage aléatoire des gamemasters
 const random_gamemaster_array = size => GAMEMASTERS.sort(() => Math.random() - 0.5).slice(0, size);
 
-/**
- * Returns a list of trained gamemasters ids by session.
- * @param {{ id: number; trained_rooms: number[] }[] } gamemasters 
- * @param {{ room: { id: number } }[] } sessions 
- * @returns {number[][]}
- */
-const getGamemasterIdsBySession = (gamemasters, sessions) =>
-  sessions.map(session =>
-    gamemasters
-      .filter(gm => gm.trained_rooms.includes(session.room.id))
-      .map(gm => gm.id));
+class GameMaster {
+  /**
+   * @param {number} id 
+   * @param {string} name 
+   * @param {number[]} trained_rooms 
+   */
+  constructor(id, name, trained_rooms) {
+    this.id = id;
+    this.name = name;
+    this.trained_rooms = trained_rooms;
+  }
+}
 
-/**
- * Backtracking algorithm to find unique combinaison of ids.
- * @param {{ index: number; selected: Set<number>; result: number[]; idsArr: number[][] }}
- * @returns 
- */
-const backtrack = ({ index, selected, result, idsArr }) => {
-  // if the end is reached, we found a valid combination.
-  if (index === idsArr.length) {
-    result.push([...selected]);
-    return;
+class Room {
+  /**
+   * @param {number} id 
+   * @param {string} name 
+   */
+  constructor(id, name) {
+    this.id = id;
+    this.name = name;
+  }
+}
+
+class Session {
+  /**
+   * @param {Room} room 
+   * @param {GameMaster} gamemaster 
+   */
+  constructor(room, gamemaster) {
+    this.room = room;
+    this.gamemaster = gamemaster;
+  }
+}
+
+class EscapeGame {
+  #gamemasters
+  #sessions
+
+  /**
+   * @param {GameMaster[]} gamemasters 
+   * @param {Session[]} sessions 
+   */
+  constructor(gamemasters, sessions) {
+    this.#gamemasters = gamemasters;
+    this.#sessions = sessions;
   }
 
-  for (let id of idsArr[index]) {
-    if (!selected.has(id)) {
-      selected.add(id);
-      // recurse to the next array
-      backtrack({ index: index + 1, selected, result, idsArr });
-      selected.delete(id);
+  /**
+   * Returns a list of trained gamemasters ids by session.
+   * @returns {number[][]}
+   */
+  #getGamemasterIdsBySession = () =>
+    this.#sessions.map(session =>
+      this.#gamemasters
+        .filter(gm => gm.trained_rooms.includes(session.room.id))
+        .map(gm => gm.id));
+
+  /**
+   * Backtracking algorithm to find unique combinaison of ids.
+   * @param {{ index: number; selected: Set<number>; result: number[]; idsArr: number[][] }}
+   * @returns 
+   */
+  #backtrack = ({ index, selected, result, idsArr }) => {
+    // if the end is reached, we found a valid combination.
+    if (index === idsArr.length) {
+      result.push([...selected]);
+      return;
+    }
+
+    for (let id of idsArr[index]) {
+      if (!selected.has(id)) {
+        selected.add(id);
+        // recurse to the next array
+        this.#backtrack({ index: index + 1, selected, result, idsArr });
+        selected.delete(id);
+      }
     }
   }
-}
 
-/**
- * Find unique ids in the list of ids array given.
- * @param {number[][]} idsArr 
- * @returns 
- */
-const findUniqueIds = (idsArr) => {
-  const result = [];
-  backtrack({ index: 0, selected: new Set(), result, idsArr });
+  /**
+   * Find unique ids in the list of ids array given.
+   * @param {number[][]} idsArr 
+   * @returns {number[]}
+   */
+  #findUniqueIds = (idsArr) => {
+    const result = [];
+    this.#backtrack({ index: 0, selected: new Set(), result, idsArr });
 
-  if (result.length === 0) {
-    throw new Error("Le tirage est impossible");
+    if (result.length === 0) {
+      throw new Error("Le tirage est impossible");
+    }
+
+    return result[0];
+  };
+
+  /**
+   * Assign the gamemasters to the session.
+   */
+  assignGamemasterToSession = () => {
+    const gamemasterIdsBySession = this.#getGamemasterIdsBySession();
+    const availableGamemasterIds = this.#findUniqueIds(gamemasterIdsBySession);
+
+    for (const [index, session] of this.#sessions.entries()) {
+      session.gamemaster = this.#gamemasters.find(gm => gm.id === availableGamemasterIds[index]);
+    }
+  };
+
+  /**
+   * Display the gamemaster assigned by session.
+   */
+  displayAssignedGamemasters = () => {
+    this.#sessions.forEach(session => {
+      console.log(`Salle : \x1b[32m${session.room.name}\x1b[0m - gamemaster : \x1b[36m${session.gamemaster.name}\x1b[0m`);
+    })
   }
-
-  return result[0];
 }
 
-/**
- * Assign the available gamemaster by session.
- * @param {{ sessions: { gamemaster }[]; gamemasters: { id: number }[]; availableGamemasterIds: number[] }}
- */
-const assignGamemasterToSession = ({ sessions, gamemasters, availableGamemasterIds }) => {
-  for (const [index, session] of sessions.entries()) {
-    session.gamemaster = gamemasters.find(gm => gm.id === availableGamemasterIds[index]);
-  }
-}
-
-/**
- * Display the gamemaster assigned by session.
- * @param {{ room: { name: string }, gamemaster: { name: string }}[]} sessions
- */
-const displayAssignedGM = (sessions) => {
-  sessions.forEach(session => {
-    console.log(`Salle : \x1b[32m${session.room.name}\x1b[0m - gamemaster : \x1b[36m${session.gamemaster.name}\x1b[0m`);
-  })
-}
 const main = () => {
   const gamemasters = random_gamemaster_array(ROOMS.length);
   const sessions = ROOMS.map(room => { return { room: room } });
+  const escapeGame = new EscapeGame(gamemasters, sessions);
 
   try {
-    const gamemasterIdsBySession = getGamemasterIdsBySession(gamemasters, sessions);
-    const availableGamemasterIds = findUniqueIds(gamemasterIdsBySession);
-    assignGamemasterToSession({ sessions, gamemasters, availableGamemasterIds });
-    displayAssignedGM(sessions)
+    escapeGame.assignGamemasterToSession();
+    escapeGame.displayAssignedGamemasters();
   } catch (error) {
     console.warn(error.message);
   }
