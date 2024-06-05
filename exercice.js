@@ -39,6 +39,9 @@ const ROOMS = [
 // Tirage aléatoire des gamemasters
 const random_gamemaster_array = size => GAMEMASTERS.sort(() => Math.random() - 0.5).slice(0, size);
 
+
+
+
 class GameMaster {
   /**
    * @param {number} id 
@@ -91,32 +94,20 @@ class EscapeGame {
    * Returns a list of trained gamemasters ids by session.
    * @returns {number[][]}
    */
-  #getGamemasterIdsBySession = () =>
-    this.#sessions.map(session =>
-      this.#gamemasters
+  #getGamemasterIdsBySession = () => {
+    const GMIdsBySession = [];
+
+    for (const session of this.#sessions) {
+      const ids = this.#gamemasters
         .filter(gm => gm.trained_rooms.includes(session.room.id))
-        .map(gm => gm.id));
-
-  /**
-   * Backtracking algorithm to find unique combinaison of ids.
-   * @param {{ index: number; selected: Set<number>; result: number[]; idsArr: number[][] }}
-   * @returns 
-   */
-  #backtrack = ({ index, selected, result, idsArr }) => {
-    // if the end is reached, we found a valid combination.
-    if (index === idsArr.length) {
-      result.push([...selected]);
-      return;
-    }
-
-    for (let id of idsArr[index]) {
-      if (!selected.has(id)) {
-        selected.add(id);
-        // recurse to the next array
-        this.#backtrack({ index: index + 1, selected, result, idsArr });
-        selected.delete(id);
+        .map(gm => gm.id);
+      if (ids.length === 0) {
+        throw new Error(`Aucun Game Master disponible pour la salle ${session.room.name}`);
       }
+      GMIdsBySession.push(ids);
     }
+
+    return GMIdsBySession;
   }
 
   /**
@@ -126,13 +117,21 @@ class EscapeGame {
    */
   #findUniqueIds = (idsArr) => {
     const result = [];
-    this.#backtrack({ index: 0, selected: new Set(), result, idsArr });
-
-    if (result.length === 0) {
+    const selected = new Set();
+    idsArr.map(ids => {
+      for (const id of ids) {
+        if (!selected.has(id)) {
+          selected.add(id);
+          result.push(id);
+          break;
+        }
+      }
+    });
+    if (result.length !== idsArr.length) {
       throw new Error("Le tirage est impossible");
     }
 
-    return result[0];
+    return result;
   };
 
   /**
@@ -152,13 +151,17 @@ class EscapeGame {
    */
   displayAssignedGamemasters = () => {
     this.#sessions.forEach(session => {
-      console.log(`Salle : \x1b[32m${session.room.name}\x1b[0m - gamemaster : \x1b[36m${session.gamemaster.name}\x1b[0m`);
+      if (session.gamemaster) {
+        console.log(`Salle : \x1b[32m${session.room.name}\x1b[0m - gamemaster : \x1b[36m${session.gamemaster?.name}\x1b[0m`);
+      } else {
+        console.warn(`Salle : \x1b[32m${session.room.name}\x1b[0m - gamemaster : \x1b[31m${session.gamemaster?.name}\x1b[0m`);
+      }
     })
   }
 }
 
 const main = () => {
-  const gamemasters = random_gamemaster_array(ROOMS.length);
+  const gamemasters = random_gamemaster_array(ROOMS.length + 2);
   const sessions = ROOMS.map(room => { return { room: room } });
   const escapeGame = new EscapeGame(gamemasters, sessions);
 
@@ -166,7 +169,7 @@ const main = () => {
     escapeGame.assignGamemasterToSession();
     escapeGame.displayAssignedGamemasters();
   } catch (error) {
-    console.warn(error.message);
+    console.warn(`\x1b[31m${error.message}\x1b[0m`);
   }
 }
 
