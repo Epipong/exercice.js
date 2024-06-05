@@ -102,7 +102,7 @@ class EscapeGame {
         .filter(gm => gm.trained_rooms.includes(session.room.id))
         .map(gm => gm.id);
       if (ids.length === 0) {
-        throw new Error(`Aucun Game Master disponible pour la salle ${session.room.name}`);
+        throw new Error(`Aucun Game Master n'est disponible pour la salle \x1b[32m${session.room.name}\x1b[0m`);
       }
       GMIdsBySession.push(ids);
     }
@@ -118,6 +118,7 @@ class EscapeGame {
   #findUniqueIds = (idsArr) => {
     const result = [];
     const selected = new Set();
+
     idsArr.map(ids => {
       for (const id of ids) {
         if (!selected.has(id)) {
@@ -127,6 +128,7 @@ class EscapeGame {
         }
       }
     });
+
     if (result.length !== idsArr.length) {
       throw new Error("Le tirage est impossible");
     }
